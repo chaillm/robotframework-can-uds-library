@@ -1,7 +1,7 @@
 *** Settings ***
 Resource      ../keywords/curf.robot
-Test Setup      Set CAN Bus ${INTERFACE} ${CHANNEL} ${BITRATE} ${DB FILE} 
-Test Teardown   End Log Can 
+Test Setup      Set CAN Bus ${INTERFACE} ${CHANNEL} ${BITRATE} ${DB FILE} ${RECEIVE OWN MESSAGES}
+Test Teardown   Shutdown Bus 
 Library    DateTime
 
 *** Variables ***
@@ -11,7 +11,7 @@ ${CHANNEL}              can0
 ${BITRATE}              500000
 ${DEFAULT TIMEOUT}      3
 ${DEFAULT NODE}         DRIVER
-
+${RECEIVE OWN MESSAGES}    FALSE
 
 *** Test Cases ***
 Log Next Raw Frame

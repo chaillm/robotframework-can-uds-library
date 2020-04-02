@@ -48,6 +48,9 @@ Stop Bus
 End Log Can
         End Can
 
+Shutdown Bus
+        Stop All
+
 # Non IsoTP CAN Keywords
 
 Get Next Raw Can Frame

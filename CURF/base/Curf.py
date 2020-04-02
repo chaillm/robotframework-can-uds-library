@@ -78,7 +78,7 @@ class Curf:
         raise AssertionError('Curf error happened : %s - %s' %
                              (error.__class__.__name__, str(error)))
 
-    def set_can(self, interface, channel, bitrate, db=None, test_name=None):
+    def set_can(self, interface, channel, bitrate, db=None, receive_own_messages=False, test_name=None):
         """ Set the CAN BUS
         Keyword arguments:
         interface -- can interface (socketcan, vector, ...)
@@ -95,21 +95,28 @@ class Curf:
         self.channel = channel
         self.bitrate = bitrate
         self.db_file = db
-        self.bus = can.interface.Bus(
-            bustype=self.interface, channel=self.channel, bitrate=self.bitrate)
-        self.logbus = can.ThreadSafeBus(
-            interface=self.interface, channel=self.channel)
+        self.receive_own_messages = receive_own_messages
+        self.bus = can.Bus(
+            bustype=self.interface, channel=self.channel, bitrate=self.bitrate, receive_own_messages=self.receive_own_messages)
+            
+#       Check if the db file is present and load it 
         if db is not None and db != 'None':
             self.db = cantools.database.load_file(db)
             self.db_default_node = self.db.nodes[0].name
+        #Get current directory of the proce ie:where you are when launching the test 
         path = os.getcwd()
-        path = path + "/outputs/" + ("%d%02d%02d/" % (dt_now.year,
+        #add outputs and data as new path for logfile
+        path = path + "/outputs"
+        if not os.path.isdir(path):
+            os.mkdir(path)
+        path = path + ("/%d%02d%02d/" % (dt_now.year,
                                                                     dt_now.month,
                                                                     dt_now.day))
         try:
             os.mkdir(path)
         except FileExistsError:
             pass
+        #file name for the log file with its absolute path
         output_candump_filename = path + ("%s_%d%02d%02d_%02d%02d%02d" % (test_name,
                                                                     dt_now.year,
                                                                     dt_now.month,
@@ -117,15 +124,28 @@ class Curf:
                                                                     dt_now.hour,
                                                                     dt_now.minute,
                                                                     dt_now.second))
-        self.logger = can.Logger(output_candump_filename)
-        self.notifier = can.Notifier(self.logbus, [self.logger])
+        #initialize logger with file name
+        self.logger = can.Logger(output_candump_filename+ ".log")
+        #add notifier for log
+        self.notifier = can.Notifier(self.bus, [self.logger])
         self.is_set = True
+
+    def stop_all(self):
+        """ Stop then CAN bus and the logger
+        """
+        #Security to be sure that we log every message 
+        #This function can be called even when there is no periodic task 
+        self.stop_periodic_message()
+        #needed otherwise the listener might not be notified of the last message 
+        time.sleep(3.0) 
+        self.notifier.stop()
+        self.bus.shutdown()
+
 
     def end_can(self):
         """ Stop the CAN BUS
         """
-        self.notifier.remove_listener(self.logger)
-        self.logger.stop()
+        self.notifier.stop()
 
     def get_message_name_by_signal(self, signal_name):
         """ Search message_name in Database by signal
@@ -249,8 +269,6 @@ class Curf:
         else:
             raise AssertionError('Signal : %s is not in Database' %
                                  (signal_name))
-
-    # def send_signals(self,signal_dict):
 
     def check_msg(self, msg_name, time_out,
                   check_not_received, node_name=None):
